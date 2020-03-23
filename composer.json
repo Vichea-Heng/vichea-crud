@@ -15,5 +15,12 @@
         "psr-4": {
             "Vichea\\Crud\\": "src/"
         }
+    },
+    "extra": {  
+        "laravel": {
+            "providers": [
+                "Vichea\\Crud\\CrudServiceProvider"
+            ]
+        }
     }
 }
