@@ -1,0 +1,19 @@
+{
+    "name": "vichea/crud",
+    "description": "blahblahblah3",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Vichea",
+            "email": "mr.vichea.007@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Vichea\\Crud\\": "src/"
+        }
+    }
+}
