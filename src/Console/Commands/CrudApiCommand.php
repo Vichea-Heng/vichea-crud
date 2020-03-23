@@ -54,8 +54,8 @@ class CrudApiCommand extends Command
             File::append(base_path("routes/api.php"), 
                 "\nRoute::apiResource('/$name_snake_case', '{$name}Controller');
                 \nRoute::get('/$name_snake_case/index/only_trashed' , '{$name}Controller@indexOnlyTrashed'); 
-                \nRoute::post('/$name_snake_case/restore/\{$name_snake_case\}' , '{$name}Controller@restore');
-                \nRoute::delete('/$name_snake_case/forceDelete/\{$name_snake_case\}' , '{$name}Controller@forceDestroy'); "
+                \nRoute::post('/$name_snake_case/restore/{{$name_snake_case}}' , '{$name}Controller@restore');
+                \nRoute::delete('/$name_snake_case/forceDelete/{{$name_snake_case}}' , '{$name}Controller@forceDestroy'); "
             );
 
             Artisan::call("make:migration create_".Str::plural($name_snake_case)."_table --create=".Str::plural($name_snake_case));
