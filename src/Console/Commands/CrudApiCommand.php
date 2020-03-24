@@ -57,11 +57,13 @@ class CrudApiCommand extends Command
             $this->factory($name,$name_with_dir);
             $this->seeder($name,$name_snake_case,$name_with_dir);
 
+            $name_with_dir = str_replace('\\','\\\\',$name_with_dir);
+
             File::append(base_path("routes/api.php"), 
-                "\nRoute::apiResource('/$name_snake_case', '{$name}Controller');
-                Route::get('/$name_snake_case/index/only_trashed' , '{$name}Controller@indexOnlyTrashed'); 
-                Route::post('/$name_snake_case/restore/{{$name_snake_case}}' , '{$name}Controller@restore');
-                Route::delete('/$name_snake_case/forceDelete/{{$name_snake_case}}' , '{$name}Controller@forceDestroy'); "
+                "\nRoute::apiResource('/$name_snake_case', '{$name_with_dir}Controller');
+                Route::get('/$name_snake_case/index/only_trashed' , '{$name_with_dir}Controller@indexOnlyTrashed'); 
+                Route::post('/$name_snake_case/restore/{{$name_snake_case}}' , '{$name_with_dir}Controller@restore');
+                Route::delete('/$name_snake_case/forceDelete/{{$name_snake_case}}' , '{$name_with_dir}Controller@forceDestroy'); "
             );
 
             Artisan::call("make:migration create_".Str::plural($name_snake_case)."_table --create=".Str::plural($name_snake_case));
