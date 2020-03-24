@@ -40,69 +40,77 @@ class CrudApiCommand extends Command
      */
     public function handle()
     {
-        $name = $this->argument("name"); 
+        $name_with_dir = $this->argument("name"); 
+        $split = preg_split("#/#", $name_with_dir); 
+        $name = end($split);
         $name_snake_case = $this->from_camel_case($name);
+        $dir = ($tmp_dir = substr($name_with_dir , 0 , - (strlen($name) + 1))) ? $tmp_dir : "";
+        ($dir == "") ? "" : ($dir = "\\" . $dir);
+        $dir = str_replace('/','\\',$dir);
+        $name_with_dir = str_replace('/','\\',$name_with_dir);
 
         if($this->option("all")){
-            $this->model($name);
-            $this->controller($name,$name_snake_case);
-            $this->request($name);
-            $this->resource($name);
-            $this->factory($name);
-            $this->seeder($name,$name_snake_case);
+            $this->model($name,$dir);
+            $this->controller($name,$name_snake_case,$name_with_dir,$dir);
+            $this->request($name,$dir);
+            $this->resource($name,$dir);
+            $this->factory($name,$name_with_dir);
+            $this->seeder($name,$name_snake_case,$name_with_dir);
 
             File::append(base_path("routes/api.php"), 
                 "\nRoute::apiResource('/$name_snake_case', '{$name}Controller');
-                \nRoute::get('/$name_snake_case/index/only_trashed' , '{$name}Controller@indexOnlyTrashed'); 
-                \nRoute::post('/$name_snake_case/restore/{{$name_snake_case}}' , '{$name}Controller@restore');
-                \nRoute::delete('/$name_snake_case/forceDelete/{{$name_snake_case}}' , '{$name}Controller@forceDestroy'); "
+                Route::get('/$name_snake_case/index/only_trashed' , '{$name}Controller@indexOnlyTrashed'); 
+                Route::post('/$name_snake_case/restore/{{$name_snake_case}}' , '{$name}Controller@restore');
+                Route::delete('/$name_snake_case/forceDelete/{{$name_snake_case}}' , '{$name}Controller@forceDestroy'); "
             );
 
             Artisan::call("make:migration create_".Str::plural($name_snake_case)."_table --create=".Str::plural($name_snake_case));
         }
         else{
             if($this->option("model")){
-                $this->model($name);
+                $this->model($name,$dir);
             }
             if($this->option("controller")){
-                $this->controller($name,$name_snake_case);
+                $this->controller($name,$name_snake_case,$name_with_dir,$dir);
             }
             if($this->option("request")){
-                $this->request($name);
+                $this->request($name,$dir);
             }
             if($this->option("resource")){
-                $this->resource($name);
+                $this->resource($name,$dir);
             }
             if($this->option("policy")){
-                $this->policy($name,$name_snake_case);
+                $this->policy($name,$name_snake_case,$name_with_dir,$dir);
             }
             if($this->option("factory")){
-                $this->factory($name);
+                $this->factory($name,$name_with_dir);
             }
             if($this->option("seeder")){
-                $this->seeder($name,$name_snake_case);
+                $this->seeder($name,$name_snake_case,$name_with_dir);
             }
         }
 
     }
 
-    public function controller($name,$name_snake_case){
+    public function controller($name,$name_snake_case,$name_with_dir,$dir){
         $modelTemplate = str_replace(
-            ['{{modelName}}','{{modelSnakeCaseName}}'],
-            [$name,$name_snake_case],
+            ['{{modelName}}','{{modelSnakeCaseName}}','{{modelNameWithDir}}','{{modelDir}}'],
+            [$name,$name_snake_case,$name_with_dir,$dir],
             file_get_contents(resource_path("stubs/Controller.stub"))
         ); 
         
-        if(!file_exists($path = app_path("Http/Controllers")))
+        $dir = str_replace('\\','/',$dir);
+
+        if(!file_exists($path = app_path("Http/Controllers".$dir)))
             mkdir($path, 0777 , true);
 
-        file_put_contents(app_path("Http/Controllers/{$name}Controller.php"), $modelTemplate);
+        file_put_contents(app_path("Http/Controllers{$dir}/{$name}Controller.php"), $modelTemplate);
     }
 
-    public function seeder($name,$name_snake_case){
+    public function seeder($name,$name_snake_case,$name_with_dir){
         $modelTemplate = str_replace(
-            ['{{modelName}}','{{modelSnakeCaseName}}'],
-            [$name,$name_snake_case],
+            ['{{modelName}}','{{modelSnakeCaseName}}','{{modelNameWithDir}}'],
+            [$name,Str::plural($name_snake_case),$name_with_dir],
             file_get_contents(resource_path("stubs/Seeder.stub"))
         ); 
         
@@ -112,64 +120,72 @@ class CrudApiCommand extends Command
         file_put_contents(base_path("database/seeds/{$name}Seeder.php"), $modelTemplate);
     }
 
-    public function policy($name,$name_snake_case){
+    public function policy($name,$name_snake_case,$name_with_dir,$dir){
         $modelTemplate = str_replace(
-            ['{{modelName}}','{{modelSnakeCaseName}}'],
-            [$name,$name_snake_case],
+            ['{{modelName}}','{{modelSnakeCaseName}}','{{modelNameWithDir}}','{{modelDir}}'],
+            [$name,$name_snake_case,$name_with_dir,$dir],
             file_get_contents(resource_path("stubs/Policy.stub"))
         ); 
+
+        $dir = str_replace('\\','/',$dir);
         
-        if(!file_exists($path = app_path("Policies")))
+        if(!file_exists($path = app_path("Policies".$dir)))
             mkdir($path, 0777 , true);
 
-        file_put_contents(app_path("Policies/{$name}Policy.php"), $modelTemplate);
+        file_put_contents(app_path("Policies{$dir}/{$name}Policy.php"), $modelTemplate);
     }
 
-    public function request($name){
+    public function request($name,$dir){
         $modelTemplate = str_replace(
-            ['{{modelName}}'],
-            [$name],
+            ['{{modelName}}','{{modelDir}}'],
+            [$name,$dir],
             file_get_contents(resource_path("stubs/Request.stub"))
         ); 
+
+        $dir = str_replace('\\','/',$dir);
         
-        if(!file_exists($path = app_path("Http/Requests")))
+        if(!file_exists($path = app_path("Http/Requests".$dir)))
             mkdir($path, 0777 , true);
 
-        file_put_contents(app_path("Http/Requests/{$name}Request.php"), $modelTemplate);
+        file_put_contents(app_path("Http/Requests{$dir}/{$name}Request.php"), $modelTemplate);
     }
 
-    public function resource($name){
+    public function resource($name,$dir){
         $modelTemplate = str_replace(
-            ['{{modelName}}'],
-            [$name],
+            ['{{modelName}}','{{modelDir}}'],
+            [$name,$dir],
             file_get_contents(resource_path("stubs/Resource.stub"))
         ); 
+
+        $dir = str_replace('\\','/',$dir);
         
-        if(!file_exists($path = app_path("Http/Resources")))
+        if(!file_exists($path = app_path("Http/Resources".$dir)))
             mkdir($path, 0777 , true);
 
-        file_put_contents(app_path("Http/Resources/{$name}Resource.php"), $modelTemplate);
+        file_put_contents(app_path("Http/Resources{$dir}/{$name}Resource.php"), $modelTemplate);
     }
     
-    public function model($name){
+    public function model($name,$dir){
         $modelTemplate = str_replace(
-            ['{{modelName}}'],
-            [$name],
+            ['{{modelName}}','{{modelDir}}'],
+            [$name,$dir],
             file_get_contents(resource_path("stubs/Model.stub"))
         ); 
+
+        $dir = str_replace('\\','/',$dir);
         
-        if(!file_exists($path = app_path("Models")))
+        if(!file_exists($path = app_path("Models".$dir)))
             mkdir($path, 0777 , true);
 
-        file_put_contents(app_path("Models/{$name}.php"), $modelTemplate);
+        file_put_contents(app_path("Models{$dir}/{$name}.php"), $modelTemplate);
     }
 
-    public function factory($name){
+    public function factory($name,$name_with_dir){
         $modelTemplate = str_replace(
-            ['{{modelName}}'],
-            [$name],
+            ['{{modelName}}','{{modelNameWithDir}}'],
+            [$name,$name_with_dir],
             file_get_contents(resource_path("stubs/Factory.stub"))
-        ); 
+        );
         
         if(!file_exists($path = base_path("database/factories")))
             mkdir($path, 0777 , true);

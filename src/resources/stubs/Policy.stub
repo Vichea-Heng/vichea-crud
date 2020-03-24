@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Policies;
+namespace App\Policies{{modelDir}};
 
-use App\Models\Contract\{{modelName}};
+use App\Models\{{modelNameWithDir}};
 use Illuminate\Auth\Access\HandlesAuthorization;
 use App\Models\User;
 

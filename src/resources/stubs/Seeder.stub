@@ -2,7 +2,7 @@
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use App\Models\{{modelName}};
+use App\Models\{{modelNameWithDir}};
 
 class {{modelName}}Seeder extends Seeder
 {
