@@ -15,7 +15,7 @@ class CrudServiceProvider extends ServiceProvider
             __DIR__ . "/resources/stubs" => "resources/stubs",
             // __DIR__."/Console/Commands/CrudApiCommand.php" => app_path("Console/Commands/CrudApiCommand.php"),
             $this->commands([
-                Console/Commands/CrudApiCommand::class,
+                CrudApiCommand::class,
             ]);
         ]); 
     }
