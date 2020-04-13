@@ -13,6 +13,7 @@ class CrudApiCommand extends Command
      * The name and signature of the console command.
      *
      * @var string
+     * 
      */
     protected $signature = 'crud:api-generator {name} {--policy} {--request} {--resource} {--factory} {--seeder} {--model} {--controller} {--all}';
 
