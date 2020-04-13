@@ -2,6 +2,7 @@
 
 namespace Vichea\Crud;
 
+use Vichea\Crud\Console\Commands\CrudApiCommand;
 use Illuminate\Support\ServiceProvider;
 
 class CrudServiceProvider extends ServiceProvider
@@ -20,7 +21,8 @@ class CrudServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                Console\Commands\CrudApiCommand::class,
+                CrudApiCommand::class,
+
             ]);
         }
     }
