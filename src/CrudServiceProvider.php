@@ -20,7 +20,7 @@ class CrudServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                src\Console\Commands\CrudApiCommand::class,
+                Console\Commands\CrudApiCommand::class,
             ]);
         }
     }
