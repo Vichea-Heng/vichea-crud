@@ -1,19 +1,13 @@
 <?php
 
-namespace App\Models{{modelDir}};
+namespace App\Models\{{modelDir}};
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class {{modelName}} extends Model
 {
-    use SoftDeletes;   
-
-    protected $guard_name = "";
-
-    protected $primaryKey = "";
-
-    public $incrementing = true;
+    use SoftDeletes;
 
     protected $fillable = [
         

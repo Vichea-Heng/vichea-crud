@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers{{modelDir}};
+namespace App\Http\Controllers\{{modelDir}};
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\ApiController;
 
-use App\Models\{{modelNameWithDir}};
-use App\Http\Requests\{{modelNameWithDir}}Request;
-use App\Http\Resources\{{modelNameWithDir}}Resource;
+use App\Models\{{modelDir}}\{{modelName}};
+use App\Http\Requests\{{modelDir}}\{{modelName}}Request;
+use App\Http\Resources\{{modelDir}}\{{modelName}}Resource;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,29 +14,13 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
-class {{modelName}}Controller extends Controller
+class {{modelName}}Controller extends ApiController
 {
-
-    public function __construct(){
-        
-    }
-
     public function index(){
 
         // $this->authorize("viewAny", {{modelName}}::class);
 
         $datas = {{modelName}}::get();
-
-        $datas = (count($datas) == 0 ? ["message" => "Record not Found"] : {{modelName}}Resource::collection($datas));
-
-        return response()->json($datas , Response::HTTP_OK);
-    }
-
-    public function indexOnlyTrashed(){
-
-        // only super admin can access, and check with middleware at the __construct function
-
-        $datas = {{modelName}}::onlyTrashed()->get();  
 
         $datas = (count($datas) == 0 ? ["message" => "Record not Found"] : {{modelName}}Resource::collection($datas));
 
@@ -56,33 +40,33 @@ class {{modelName}}Controller extends Controller
         return response()->json($data , Response::HTTP_OK);
     }
 
-    public function show({{modelName}} ${{modelSnakeCaseName}}){
+    public function show({{modelName}} ${{modelCamelCaseName}}){
 
         // $this->authorize("view", {{modelName}}::class);
 
-        $data = new {{modelName}}Resource(${{modelSnakeCaseName}});
+        $data = new {{modelName}}Resource(${{modelCamelCaseName}});
 
         return response()->json($data , Response::HTTP_OK);
     }
 
-    public function update({{modelName}}Request $request,{{modelName}} ${{modelSnakeCaseName}}){
+    public function update({{modelName}}Request $request,{{modelName}} ${{modelCamelCaseName}}){
 
         // $this->authorize("update", {{modelName}}::class);
 
         $data = $request->validated();
 
-        ${{modelSnakeCaseName}}->update($data); 
+        ${{modelCamelCaseName}}->update($data); 
 
-        $data = new {{modelName}}Resource(${{modelSnakeCaseName}});
+        $data = new {{modelName}}Resource(${{modelCamelCaseName}});
         
         return response()->json($data , Response::HTTP_OK);
     }
 
-    public function destroy({{modelName}} ${{modelSnakeCaseName}}){
+    public function destroy({{modelName}} ${{modelCamelCaseName}}){
 
         // $this->authorize("delete", {{modelName}}::class);
 
-        ${{modelSnakeCaseName}}->delete();
+        ${{modelCamelCaseName}}->delete();
 
         $data = ["message" => "Data Delete successfully !!!"];
 

@@ -2,27 +2,34 @@
 
 namespace Vichea\Crud;
 
+use Arr;
+use DB;
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Contracts\Filesystem\FileExistsException;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use Schema;
 
-class CrudApiCommand extends Command
+class MakeCrudApi extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
-     * 
      */
-    protected $signature = 'crud:api-generator {name} {--policy} {--request} {--resource} {--factory} {--seeder} {--model} {--controller} {--all}';
+    protected $signature = 'make:api-crud {name} {--options=a : m=Model,c=Controller,r=Resource,f=FormRequest,a=All}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Create CRUD for API';
+    protected $description = 'Generate api crud based on table. Note: should have table in advance.';
+
+    protected $tableInfo;
+    protected $stubsPath;
+    protected $name;
+    protected $dir;
 
     /**
      * Create a new command instance.
@@ -32,6 +39,10 @@ class CrudApiCommand extends Command
     public function __construct()
     {
         parent::__construct();
+
+        $this->stubsPath = app_path('Console/Commands/stubs/crud/');
+
+        DB::connection()->getDoctrineSchemaManager()->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
     }
 
     /**
@@ -41,182 +52,217 @@ class CrudApiCommand extends Command
      */
     public function handle()
     {
-        $name_with_dir = $this->argument("name");
-        $split = preg_split("#/#", $name_with_dir);
-        $name = end($split);
-        $name_snake_case = $this->from_camel_case($name);
-        $dir = ($tmp_dir = substr($name_with_dir, 0, - (strlen($name) + 1))) ? $tmp_dir : "";
-        ($dir == "") ? "" : ($dir = "\\" . $dir);
-        $dir = str_replace('/', '\\', $dir);
-        $name_with_dir = str_replace('/', '\\', $name_with_dir);
+        $this->name = last(explode('/', $this->argument('name')));
+        $this->dir = substr($this->argument('name'), 0, strrpos($this->argument('name'), '/') + 1);
 
-        if ($this->option("all")) {
-            $this->model($name, $dir);
-            $this->controller($name, $name_snake_case, $name_with_dir, $dir);
-            $this->request($name, $dir);
-            $this->resource($name, $dir);
-            $this->factory($name, $name_with_dir);
-            $this->seeder($name, $name_snake_case, $name_with_dir);
+        $this->tableInfo = DB::select('describe ' . $this->ask('What is your table name?'));
 
-            $name_with_dir = str_replace('\\', '\\\\', $name_with_dir);
+        if (Str::contains($this->option('options'), ['a', 'm']))
+            $this->generateModel();
 
-            File::append(
-                base_path("routes/api.php"),
-                "\nRoute::apiResource('/$name_snake_case', '{$name_with_dir}Controller');
-                Route::get('/$name_snake_case/index/only_trashed' , '{$name_with_dir}Controller@indexOnlyTrashed'); 
-                Route::post('/$name_snake_case/restore/{{$name_snake_case}}' , '{$name_with_dir}Controller@restore');
-                Route::delete('/$name_snake_case/forceDelete/{{$name_snake_case}}' , '{$name_with_dir}Controller@forceDestroy'); "
-            );
+        if (Str::contains($this->option('options'), ['a', 'c']))
+            $this->generateController();
 
-            Artisan::call("make:migration create_" . Str::plural($name_snake_case) . "_table --create=" . Str::plural($name_snake_case));
-        } else {
-            if ($this->option("model")) {
-                $this->model($name, $dir);
-            }
-            if ($this->option("controller")) {
-                $this->controller($name, $name_snake_case, $name_with_dir, $dir);
-            }
-            if ($this->option("request")) {
-                $this->request($name, $dir);
-            }
-            if ($this->option("resource")) {
-                $this->resource($name, $dir);
-            }
-            if ($this->option("policy")) {
-                $this->policy($name, $name_snake_case, $name_with_dir, $dir);
-            }
-            if ($this->option("factory")) {
-                $this->factory($name, $name_with_dir);
-            }
-            if ($this->option("seeder")) {
-                $this->seeder($name, $name_snake_case, $name_with_dir);
-            }
+        if (Str::contains($this->option('options'), ['a', 'f']))
+            $this->generateFormRequest();
+
+        if (Str::contains($this->option('options'), ['a', 'p']))
+            $this->generatePolicy();
+
+        if (Str::contains($this->option('options'), ['a', 'r']))
+            $this->generateResource();
+    }
+
+    private function generateModel()
+    {
+        $modelDir = substr(str_replace('/', '\\', $this->dir), 0, -1);
+        $content = str_replace(
+            ['{{modelDir}}', '{{modelName}}'],
+            [$modelDir, $this->name],
+            file_get_contents($this->stubsPath . 'Model.stub')
+        );
+
+        $dir = $this->getModelsPath() . $this->dir;
+
+        $this->generate($dir, $content);
+
+        $this->line("<fg=green>Model generated:\n{$dir}{$this->name}.php</>\n");
+    }
+
+    private function generateController()
+    {
+        $modelDir = substr(str_replace('/', '\\', $this->dir), 0, -1);
+        $content = str_replace(
+            ['{{modelName}}', '{{modelCamelCaseName}}', '{{modelDir}}'],
+            [$this->name, Str::camel($this->name), $modelDir],
+            file_get_contents($this->stubsPath . 'Controller.stub')
+        );
+
+        $dir = $this->getControllersPath() . $this->dir;
+
+        $this->generate($dir, $content);
+
+        $this->line("<fg=green>Controller generated:\n{$dir}{$this->name}.php</>\n");
+    }
+
+    private function generatePolicy()
+    {
+        $modelDir = substr(str_replace('/', '\\', $this->dir), 0, -1);
+        $content = str_replace(
+            ['{{modelName}}', '{{modelCamelCaseName}}', '{{modelDir}}'],
+            [$this->name, Str::camel($this->name), $modelDir],
+            file_get_contents($this->stubsPath . 'Policy.stub')
+        );
+
+        $dir = $this->getPoliciesPath() . $this->dir;
+
+        $this->generate($dir, $content);
+
+        $this->line("<fg=green>Policy generated:\n{$dir}{$this->name}.php</>\n");
+    }
+
+    private function generateFormRequest()
+    {
+        $modelDir = substr(str_replace('/', '\\', $this->dir), 0, -1);
+        $content = str_replace(
+            ['{{modelName}}', '{{modelDir}}', '{{rules}}'],
+            [$this->name, $modelDir, $this->getAllRules()],
+            file_get_contents($this->stubsPath . 'Request.stub')
+        );
+
+        $dir = $this->getRequestsPath() . $this->dir;
+
+        $this->generate($dir, $content);
+
+        $this->line("<fg=green>Form request generated:\n{$dir}{$this->name}.php</>\n");
+    }
+
+    private function generateResource()
+    {
+        $modelDir = substr(str_replace('/', '\\', $this->dir), 0, -1);
+        $content = str_replace(
+            ['{{modelName}}', '{{modelDir}}', '{{columns}}'],
+            [$this->name, $modelDir, $this->getAllResourceColumns()],
+            file_get_contents($this->stubsPath . 'Resource.stub')
+        );
+
+        $dir = $this->getResourcesPath() . $this->dir;
+
+        $this->generate($dir, $content);
+
+        $this->line("<fg=green>Resource generated:\n{$dir}{$this->name}.php</>\n");
+    }
+
+    private function generate($fullDirPath, $content)
+    {
+        if (file_exists($fullDirPath . $this->name . '.php'))
+            throw new FileExistsException();
+
+        if (!file_exists($fullDirPath))
+            mkdir($fullDirPath, 0777, true);
+
+        file_put_contents($fullDirPath . $this->name . '.php', $content);
+    }
+
+    private function getAllResourceColumns(): string
+    {
+        $allColumns = [];
+        foreach ($this->tableInfo as $column) {
+            if (!in_array($column->Field, ['created_at', 'updated_at', 'deleted_at']))
+                $allColumns[$column->Field] = '$this->' . $column->Field;
         }
+
+        $format = '';
+        foreach ($allColumns as $key => $val)
+            $format .= "'$key' => $val," . PHP_EOL;
+
+        return $format;
     }
 
-    public function controller($name, $name_snake_case, $name_with_dir, $dir)
+    private function getAllRules(): string
     {
-        $modelTemplate = str_replace(
-            ['{{modelName}}', '{{modelSnakeCaseName}}', '{{modelNameWithDir}}', '{{modelDir}}'],
-            [$name, $name_snake_case, $name_with_dir, $dir],
-            file_get_contents(resource_path("stubs/Controller.stub"))
-        );
-
-        $dir = str_replace('\\', '/', $dir);
-
-        if (!file_exists($path = app_path("Http/Controllers" . $dir)))
-            mkdir($path, 0777, true);
-
-        file_put_contents(app_path("Http/Controllers{$dir}/{$name}Controller.php"), $modelTemplate);
-    }
-
-    public function seeder($name, $name_snake_case, $name_with_dir)
-    {
-        $modelTemplate = str_replace(
-            ['{{modelName}}', '{{modelSnakeCaseName}}', '{{modelNameWithDir}}'],
-            [$name, Str::plural($name_snake_case), $name_with_dir],
-            file_get_contents(resource_path("stubs/Seeder.stub"))
-        );
-
-        if (!file_exists($path = base_path("database/seeds")))
-            mkdir($path, 0777, true);
-
-        file_put_contents(base_path("database/seeds/{$name}Seeder.php"), $modelTemplate);
-    }
-
-    public function policy($name, $name_snake_case, $name_with_dir, $dir)
-    {
-        $modelTemplate = str_replace(
-            ['{{modelName}}', '{{modelSnakeCaseName}}', '{{modelNameWithDir}}', '{{modelDir}}'],
-            [$name, $name_snake_case, $name_with_dir, $dir],
-            file_get_contents(resource_path("stubs/Policy.stub"))
-        );
-
-        $dir = str_replace('\\', '/', $dir);
-
-        if (!file_exists($path = app_path("Policies" . $dir)))
-            mkdir($path, 0777, true);
-
-        file_put_contents(app_path("Policies{$dir}/{$name}Policy.php"), $modelTemplate);
-    }
-
-    public function request($name, $dir)
-    {
-        $modelTemplate = str_replace(
-            ['{{modelName}}', '{{modelDir}}'],
-            [$name, $dir],
-            file_get_contents(resource_path("stubs/Request.stub"))
-        );
-
-        $dir = str_replace('\\', '/', $dir);
-
-        if (!file_exists($path = app_path("Http/Requests" . $dir)))
-            mkdir($path, 0777, true);
-
-        file_put_contents(app_path("Http/Requests{$dir}/{$name}Request.php"), $modelTemplate);
-    }
-
-    public function resource($name, $dir)
-    {
-        $modelTemplate = str_replace(
-            ['{{modelName}}', '{{modelDir}}'],
-            [$name, $dir],
-            file_get_contents(resource_path("stubs/Resource.stub"))
-        );
-
-        $dir = str_replace('\\', '/', $dir);
-
-        if (!file_exists($path = app_path("Http/Resources" . $dir)))
-            mkdir($path, 0777, true);
-
-        file_put_contents(app_path("Http/Resources{$dir}/{$name}Resource.php"), $modelTemplate);
-    }
-
-    public function model($name, $dir)
-    {
-        $modelTemplate = str_replace(
-            ['{{modelName}}', '{{modelDir}}'],
-            [$name, $dir],
-            file_get_contents(resource_path("stubs/Model.stub"))
-        );
-
-        $dir = str_replace('\\', '/', $dir);
-
-        if (!file_exists($path = app_path("Models" . $dir)))
-            mkdir($path, 0777, true);
-
-        file_put_contents(app_path("Models{$dir}/{$name}.php"), $modelTemplate);
-    }
-
-    public function factory($name, $name_with_dir)
-    {
-        $modelTemplate = str_replace(
-            ['{{modelName}}', '{{modelNameWithDir}}'],
-            [$name, $name_with_dir],
-            file_get_contents(resource_path("stubs/Factory.stub"))
-        );
-
-        if (!file_exists($path = base_path("database/factories")))
-            mkdir($path, 0777, true);
-
-        file_put_contents(base_path("database/factories/{$name}Factory.php"), $modelTemplate);
-    }
-
-
-
-
-
-
-
-
-
-    public function from_camel_case($input)
-    {
-        preg_match_all('!([A-Z][A-Z0-9]*(?=$|[A-Z][a-z0-9])|[A-Za-z][a-z0-9]+)!', $input, $matches);
-        $ret = $matches[0];
-        foreach ($ret as &$match) {
-            $match = $match == strtoupper($match) ? strtolower($match) : lcfirst($match);
+        $allRules = [];
+        foreach ($this->tableInfo as $column) {
+            if (!in_array($column->Field, ['id', 'created_at', 'updated_at', 'deleted_at']))
+                $allRules[$column->Field] =  '[\'' . implode("', '", $this->getRulesByColumn($column)) . '\']';
         }
-        return implode('_', $ret);
+
+        $format = '';
+        foreach ($allRules as $key => $val)
+            $format .= "'$key' => $val," . PHP_EOL;
+
+        return $format;
+    }
+
+    private function getRulesByColumn($column)
+    {
+        $rules = collect('bail');
+        if ($column->Null == 'NO')
+            $rules->add('required');
+
+        $rules->add($this->getRulesByType($column->Type));
+
+        return $rules->flatten(1)->toArray();
+    }
+
+    /**
+     * currently does not support unsigned
+     */
+    private function getRulesByType($type)
+    {
+        $rules = collect();
+
+        $mainType = explode(' ', $type)[0];
+        if (Str::startsWith($mainType, ['tinyint', 'smallint', 'int', 'bigint']))
+            $rules->add('integer');
+        elseif (Str::startsWith($mainType, 'json'))
+            $rules->add('json');
+        elseif (Str::startsWith($mainType, 'enum')) {
+            $rules->add('in:' . str_replace('\'', '', substr($mainType, strpos($mainType, '(') + 1, -1)));
+        } elseif (Str::startsWith($mainType, 'varchar')) {
+            $rules->add('string');
+            $rules->add('max:' . substr($mainType, strpos($mainType, '(') + 1, -1));
+        } elseif (Str::startsWith($mainType, 'timestamp')) {
+            $rules->add('date');
+        }
+
+        return $rules;
+    }
+
+    public function getEnumValues($table, $column)
+    {
+        $type = DB::select(DB::raw("SHOW COLUMNS FROM $table WHERE Field = '{$column}'"))[0]->Type;
+        preg_match('/^enum\((.*)\)$/', $type, $matches);
+        $enum = array();
+        foreach (explode(',', $matches[1]) as $value) {
+            $v = trim($value, "'");
+            $enum = Arr::add($enum, $v, $v);
+        }
+        return $enum;
+    }
+
+    private function getModelsPath()
+    {
+        return app_path('Models/');
+    }
+
+    private function getControllersPath()
+    {
+        return app_path('Http/Controllers/Api/v1/');
+    }
+
+    private function getResourcesPath()
+    {
+        return app_path('Http/Resources/');
+    }
+
+    private function getRequestsPath()
+    {
+        return app_path('Http/Requests/');
+    }
+
+    private function getPoliciesPath()
+    {
+        return app_path('Policies/');
     }
 }

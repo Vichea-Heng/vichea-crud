@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Policies\{{modelDir}};
+
+use App\Models\{{modelDir}}\{{modelName}};
+use Illuminate\Auth\Access\HandlesAuthorization;
+use App\Models\Users\User;
+
+class {{modelName}}Policy
+{
+    use HandlesAuthorization;
+
+    public function before($user, $ability)
+    {
+        if($user->can('Admin {{modelName}}'))
+            return true;
+    }
+
+    public function viewAny(User $user)
+    {
+        return $this->determine($user, ${{modelCamelCaseName}}, 'ViewAny');
+    }
+
+    public function view(User $user, {{modelName}} ${{modelCamelCaseName}})
+    {
+        return $this->determine($user, ${{modelCamelCaseName}}, 'View');
+    }
+    
+    public function create(User $user)
+    {
+        return $this->determine($user, ${{modelCamelCaseName}}, 'Create');
+    }
+
+    public function update(User $user, {{modelName}} ${{modelCamelCaseName}})
+    {
+        return $this->determine($user, ${{modelCamelCaseName}}, 'Update');
+    }
+
+    public function delete(User $user, {{modelName}} ${{modelCamelCaseName}})
+    {
+        return $this->determine($user, ${{modelCamelCaseName}}, 'Delete');
+    }
+
+    public function restore(User $user, {{modelName}} ${{modelCamelCaseName}})
+    {
+        return $this->determine($user, ${{modelCamelCaseName}}, 'Restore');
+    }
+
+    //Gate before will handle this case
+    public function forceDelete(User $user, {{modelName}} ${{modelCamelCaseName}})
+    {
+        return false;
+    }
+
+    private function determine(User $user, {{modelName}} ${{modelCamelCaseName}}, $action)
+    {
+        if ($user->can($action . ' Any {{modelName}}'))
+            return true;
+
+        if ($user->can($action . ' Own {{modelName}}'))
+            return $user->id == ${{modelCamelCaseName}}->user_id;
+
+        return false;
+    }
+}
