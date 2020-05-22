@@ -2,15 +2,12 @@
 
 namespace Vichea\Crud;
 
-use Arr;
-use DB;
-use Illuminate\Console\Command;
-use Illuminate\Contracts\Filesystem\FileExistsException;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
-use Schema;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Contracts\Filesystem\FileExistsException;
 
-class MakeCrudApi extends Command
+class CrudApiCommand extends Command
 {
     /**
      * The name and signature of the console command.
@@ -227,18 +224,6 @@ class MakeCrudApi extends Command
         }
 
         return $rules;
-    }
-
-    public function getEnumValues($table, $column)
-    {
-        $type = DB::select(DB::raw("SHOW COLUMNS FROM $table WHERE Field = '{$column}'"))[0]->Type;
-        preg_match('/^enum\((.*)\)$/', $type, $matches);
-        $enum = array();
-        foreach (explode(',', $matches[1]) as $value) {
-            $v = trim($value, "'");
-            $enum = Arr::add($enum, $v, $v);
-        }
-        return $enum;
     }
 
     private function getModelsPath()
